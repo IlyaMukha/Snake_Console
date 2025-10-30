@@ -166,24 +166,6 @@ namespace ConsoleApp
         static async Task Main(string[] args)
         {
             await Start();
-            //using var bmp = new Bitmap("D:\\.Net\\ConsoleApp\\ConsoleApp\\image.jpg");
-            //for (int y = 0; y < bmp.Height; y += 16)
-            //{
-            //    for (int x = 0; x < bmp.Width; x +=8)
-            //    {
-            //        var pixel = bmp.GetPixel(x, y);
-            //        int brightness = (pixel.R + pixel.G + pixel.B) / 3;
-            //        char c = brightness switch
-            //        {
-            //            < 64 => '#',
-            //            < 128 => '*',
-            //            < 192 => '.',
-            //            _ => ' '
-            //        };
-            //        Console.Write(c);
-            //    }
-            //    Console.WriteLine();
-            //}
         }
         static async Task Start()
         {
