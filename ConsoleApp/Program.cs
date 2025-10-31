@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 using static System.Formats.Asn1.AsnWriter;
 namespace ConsoleApp
@@ -13,6 +14,34 @@ namespace ConsoleApp
         public const int Height = 20;
         public const int Width = 20;
     }
+    public static class Colors
+    {
+        public static Color Red { get { return new Color(ConsoleColor.Red, ConsoleColor.DarkRed); } }
+        public static Color Blue { get { return new Color(ConsoleColor.Blue, ConsoleColor.DarkBlue); } }
+        public static Color Green { get { return new Color(ConsoleColor.Green, ConsoleColor.DarkGreen); } }
+        public static Color Yellow { get { return new Color(ConsoleColor.Yellow, ConsoleColor.DarkYellow); } }
+        public static ConsoleColor Wall { get { return ConsoleColor.White; } }
+        public static ConsoleColor Food { get { return ConsoleColor.Cyan; } }
+
+    }
+    public static class Controls
+    {
+        public static List<ConsoleKey> Arrows
+        {
+            get { return new List<ConsoleKey>() { ConsoleKey.RightArrow, ConsoleKey.LeftArrow, ConsoleKey.UpArrow, ConsoleKey.DownArrow }; }
+        }
+        public static List<ConsoleKey> WASD
+        {
+            get { return new List<ConsoleKey>() { ConsoleKey.D, ConsoleKey.A, ConsoleKey.W, ConsoleKey.S }; }
+        }
+    }
+    public static class StartPoint
+    {
+        public static (int i, int j) LeftTop = (1, 1);
+        public static (int i, int j) LeftBottom = (Settings.Width, 1);
+        public static (int i, int j) RightTop = (1, Settings.Height);
+        public static (int i, int j) RightBottom = (Settings.Height, Settings.Width);
+    }
     public enum Direction
     {
         Left,
@@ -20,7 +49,17 @@ namespace ConsoleApp
         Up,
         Down
     }
+    public class Color
+    {
+        public ConsoleColor MainColor {  get; set; }
+        public ConsoleColor ThecondColor { get; set; }
 
+        public Color(ConsoleColor main, ConsoleColor thecond)
+        {
+            MainColor = main;
+            ThecondColor = thecond;
+        }
+    }
     public class Map
     {
         public static int Rows
@@ -57,9 +96,9 @@ namespace ConsoleApp
         {
             int iq = 0;
             int jq = 0;
-            var snakesCoords = snakes.Select(q => new { q.Player, q.snake });
+            var snakesCoords = snakes.Select(q => new {q.snake, q.Color });
             var heads = snakes.Select(q => q.Head);
-            Console.Clear();
+            Console.SetCursorPosition(0, 0);
             for (int i = 0; i < Rows; i++)
             {
                 for (int j = 0; j < Columns; j++)
@@ -69,34 +108,24 @@ namespace ConsoleApp
                     if (temp != null)
                     {
                         if(heads.Contains((i,j)))
-                        {
-                            if (temp.Player == 1)
-                                Console.ForegroundColor = ConsoleColor.Green;
-                            else
-                                Console.ForegroundColor = ConsoleColor.Blue;
-                        }
+                            Console.ForegroundColor = temp.Color.MainColor;
                         else
-                        {
-                            if (temp.Player == 2)
-                                Console.ForegroundColor = ConsoleColor.DarkGreen;
-                            else
-                                Console.ForegroundColor = ConsoleColor.DarkBlue;
-                        }
+                            Console.ForegroundColor = temp.Color.ThecondColor;
                         Console.Write(point);
                     }
                     else if ((i, j) == Food)
                     {
-                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.ForegroundColor = Colors.Food;
                         Console.Write(point);
                     }
                     else if (walls.Contains((i, j)))
                     {
-                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.ForegroundColor = Colors.Wall;
                         Console.Write(point);
                     }
                     else
                     {
-                        Console.ForegroundColor = ConsoleColor.White;
+                        Console.ForegroundColor = ConsoleColor.Black;
                         Console.Write(point);
                     }
                 }
@@ -105,7 +134,9 @@ namespace ConsoleApp
             Console.ResetColor();
             for (int i = 0; i < snakes.Count; i++)
             {
-                Console.WriteLine($"Score{i + 1}:{snakes[i].Score}");
+                Console.SetCursorPosition(0, Rows + i);
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.Write($"Score{snakes[i].PlayerId}: {snakes[i].Score}   ");
             }
         }
         public void GenerateFood()
@@ -127,42 +158,31 @@ namespace ConsoleApp
     }
     public class Snake
     {
+        public Color Color;
         public ConsoleKey R;
         public ConsoleKey L;
         public ConsoleKey U;
         public ConsoleKey D;
-        public int Player;
+        public static int TotalPlayers = 0;
+        public int PlayerId;
         public bool isGameOver = false;
         public int HeightsScore = Settings.Width;
         public (int i, int j) Head = (0, 0);
         public List<(int i, int j)> snake = new List<(int, int)>();
         public int Score { get; set; }
         public Direction direction = Direction.Right;
-        public Snake(int x, int y, Direction direction, ConsoleKey r, ConsoleKey l, ConsoleKey u, ConsoleKey d, int player)
+        public Snake((int i, int j) startPoint, Direction direction, List<ConsoleKey> keys, Color color)
         {
-            R = r;
-            L = l;
-            U = u;
-            D = d;
-            //matrix = new string[Rows, Columns];
+            R = keys[0];
+            L = keys[1];
+            U = keys[2];
+            D = keys[3];
+            Color = color;
             this.direction = direction;
             Score = 1;
-            snake.Add((x, y));
-            Player = player;
-            //for (int i = 0; i < Rows; i++)
-            //{
-            //    for (int j = 0; j < Columns; j++)
-            //    {
-            //        if(i == 0 || i == Rows - 1 || j == 0 || j == Columns -1)
-            //        {
-            //            matrix[i, j] = Settings.Element;
-            //            walls.Add((i, j));
-            //        }
-            //        else
-            //            matrix[i,j] = Settings.Empty;
-            //    }
-            //}
-            //matrix[x,y] = Settings.Element;
+            snake.Add(startPoint);
+            TotalPlayers++;
+            PlayerId = TotalPlayers;
         }
         public void Move(Map map)
         {
@@ -220,62 +240,72 @@ namespace ConsoleApp
         }
         static async Task Start()
         {
-            List<Snake> snakes = new List<Snake>();
-            snakes.Add(new Snake(1, 1, Direction.Right, ConsoleKey.RightArrow, ConsoleKey.LeftArrow, ConsoleKey.UpArrow, ConsoleKey.DownArrow, 1));
-            snakes.Add(new Snake(Settings.Width, Settings.Height, Direction.Left, ConsoleKey.D, ConsoleKey.A, ConsoleKey.W, ConsoleKey.S, 2));
+            Console.CursorVisible = false;
             Map map = new Map();
+            List<Snake> snakes = new List<Snake>()
+            {
+                //new Snake(StartPoint.RightTop, Direction.Down, Controls.Arrows, Colors.Red),
+                //new Snake(StartPoint.LeftBottom, Direction.Up, Controls.Arrows, Colors.Green),
+                new Snake(StartPoint.LeftTop, Direction.Right, Controls.Arrows, Colors.Yellow),
+                new Snake(StartPoint.RightBottom, Direction.Left, Controls.WASD, Colors.Blue)
+            };
+
             map.GenerateFood();
-            List<Task> tasks = new List<Task>();
-            var game = Task.Run(() => Game(snakes, map));
-            var paint = Task.Run(() => Paint(map, snakes));
-            tasks.Add(game);
-            tasks.Add(paint);
-            tasks.Add(Task.Run(() => Player(snakes[0])));
-            tasks.Add(Task.Run(() => Player(snakes[1])));
+            List<Task> tasks = new List<Task>()
+            {
+                Task.Run(() => Move(snakes, map)),
+                Task.Run(() => Render(snakes, map)),
+                Task.Run(() => Control(snakes))
+            };
             await Task.WhenAll(tasks);
-            Console.ReadKey();
         }
-        static void Player(Snake snake)
+        static async Task Control(List<Snake> snakes)
         {
             while (true)
             {
-                var button = Console.ReadKey(true).Key;
-                if (snake.R == button && snake.direction != Direction.Left)
+                if (Console.KeyAvailable)
                 {
-                    snake.direction = Direction.Right;
+                    var button = Console.ReadKey(true).Key;
+                    foreach (var snake in snakes)
+                    {
+                        if (snake.R == button && snake.direction != Direction.Left)
+                        {
+                            snake.direction = Direction.Right;
+                        }
+                        else if (snake.L == button && snake.direction != Direction.Right)
+                        {
+                            snake.direction = Direction.Left;
+                        }
+                        else if (snake.U == button && snake.direction != Direction.Down)
+                        {
+                            snake.direction = Direction.Up;
+                        }
+                        else if (snake.D == button && snake.direction != Direction.Up)
+                        {
+                            snake.direction = Direction.Down;
+                        }
+                    }
+                    
                 }
-                else if (snake.L == button && snake.direction != Direction.Right)
-                {
-                    snake.direction = Direction.Left;
-                }
-                else if(snake.U == button && snake.direction != Direction.Down)
-                {
-                    snake.direction = Direction.Up;
-                }
-                else if (snake.D == button && snake.direction != Direction.Up)
-                {
-                    snake.direction = Direction.Down;
-                }
-                Thread.Sleep(1);
+                await Task.Delay(10);
             }
         }
-        static void Game(List<Snake> snakes, Map map)
+        static async Task Move(List<Snake> snakes, Map map)
         {
             while (true)
             {
                 for (int i = 0; i < snakes.Count; i++)
-                {
                     snakes[i].Move(map);
-                }
-                Thread.Sleep(Settings.Speed);
+
+                await Task.Delay(Settings.Speed);
             }
         }
-        static void Paint(Map map, List<Snake> snakes)
+        static async Task Render(List<Snake> snakes, Map map)
         {
-            while (true) //(!snake.isGameOver)
+            while (true)
             {
                 map.Print(snakes);
-                Thread.Sleep(500);
+                await Task.Delay(10);
             }
         }
     }
