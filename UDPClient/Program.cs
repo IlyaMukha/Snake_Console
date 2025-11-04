@@ -26,7 +26,7 @@ namespace UDPClient
         public static Color Blue { get { return new Color(ConsoleColor.Blue, ConsoleColor.DarkBlue); } }
         public static Color Green { get { return new Color(ConsoleColor.Green, ConsoleColor.DarkGreen); } }
         public static Color Yellow { get { return new Color(ConsoleColor.Yellow, ConsoleColor.DarkYellow); } }
-        public static ConsoleColor Wall { get { return ConsoleColor.Red; } }
+        public static ConsoleColor Wall { get { return ConsoleColor.White; } }
         public static ConsoleColor Food { get { return ConsoleColor.Cyan; } }
 
     }
