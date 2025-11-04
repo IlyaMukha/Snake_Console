@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace UDPClient
@@ -235,8 +236,23 @@ namespace UDPClient
     }
     internal class Program
     {
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern IntPtr GetConsoleWindow();
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
+
         static async Task Main(string[] args)
         {
+            IntPtr handle = GetConsoleWindow();
+
+            MoveWindow(handle, 100, 100, 400, 400, true);
+
+            Console.SetWindowSize(44, 27);
+            //Console.SetBufferSize(44, 27);
+
+            Console.Title = "КЛИЕНТ";
+
             string serverIp = "127.0.0.1";
             const int serverPort = 5000;
             Map map = new Map();
