@@ -1,21 +1,15 @@
 ﻿using Newtonsoft.Json;
-using System;
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
-using System.Xml.Linq;
-using static System.Formats.Asn1.AsnWriter;
-namespace ConsoleApp
+
+namespace UDPClient
 {
     public class Data
     {
         public string[,] Matrix { get; set; }
-        public (int i, int j) Head { get ; set; }
+        public (int i, int j) Head { get; set; }
         public List<(int i, int j)> Snake { get; set; }
         public (int i, int j) Food { get; set; }
     }
@@ -37,17 +31,6 @@ namespace ConsoleApp
         public static ConsoleColor Food { get { return ConsoleColor.Cyan; } }
 
     }
-    public static class Controls
-    {
-        public static List<ConsoleKey> Arrows
-        {
-            get { return new List<ConsoleKey>() { ConsoleKey.RightArrow, ConsoleKey.LeftArrow, ConsoleKey.UpArrow, ConsoleKey.DownArrow }; }
-        }
-        public static List<ConsoleKey> WASD
-        {
-            get { return new List<ConsoleKey>() { ConsoleKey.D, ConsoleKey.A, ConsoleKey.W, ConsoleKey.S }; }
-        }
-    }
     public static class StartPoint
     {
         public static (int i, int j) LeftTop = (1, 1);
@@ -60,12 +43,11 @@ namespace ConsoleApp
         Left,
         Right,
         Up,
-        Down,
-        None
+        Down
     }
     public class Color
     {
-        public ConsoleColor MainColor {  get; set; }
+        public ConsoleColor MainColor { get; set; }
         public ConsoleColor ThecondColor { get; set; }
 
         public Color(ConsoleColor main, ConsoleColor thecond)
@@ -106,25 +88,23 @@ namespace ConsoleApp
                 }
             }
         }
-        public void Print(List<Snake> snakes)
+        public void Print(Snake snake)
         {
             int iq = 0;
             int jq = 0;
-            var snakesCoords = snakes.Select(q => new {q.snake, q.Color });
-            var heads = snakes.Select(q => q.Head);
+            var heads = snake.Head;
             Console.SetCursorPosition(0, 0);
             for (int i = 0; i < Rows; i++)
             {
                 for (int j = 0; j < Columns; j++)
                 {
                     var point = matrix[i, j];
-                    var temp = snakesCoords.FirstOrDefault(q => q.snake.Contains((i,j)));
-                    if (temp != null)
+                    if (snake.snake.Contains((i, j)))
                     {
-                        if(heads.Contains((i,j)))
-                            Console.ForegroundColor = temp.Color.MainColor;
+                        if (heads == (i, j))
+                            Console.ForegroundColor = snake.Color.MainColor;
                         else
-                            Console.ForegroundColor = temp.Color.ThecondColor;
+                            Console.ForegroundColor = snake.Color.ThecondColor;
                         Console.Write(point);
                     }
                     else if ((i, j) == Food)
@@ -145,13 +125,9 @@ namespace ConsoleApp
                 }
                 //Console.WriteLine();
             }
-            Console.ResetColor();
-            for (int i = 0; i < snakes.Count; i++)
-            {
-                Console.SetCursorPosition(0, Rows + i);
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.Write($"Score{snakes[i].PlayerId}: {snakes[i].Score}   ");
-            }
+            Console.SetCursorPosition(0, Rows + 1);
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write($"Score{snake.PlayerId}: {snake.Score}   ");
         }
         public void GenerateFood()
         {
@@ -177,6 +153,7 @@ namespace ConsoleApp
         public ConsoleKey L;
         public ConsoleKey U;
         public ConsoleKey D;
+        public bool isChange = false;
         public static int TotalPlayers = 0;
         public int PlayerId;
         public bool isGameOver = false;
@@ -205,7 +182,7 @@ namespace ConsoleApp
             switch (direction)
             {
                 case Direction.Left:
-                    newH = (currenH.i, currenH.j -1);
+                    newH = (currenH.i, currenH.j - 1);
                     break;
                 case Direction.Right:
                     newH = (currenH.i, currenH.j + 1);
@@ -235,8 +212,8 @@ namespace ConsoleApp
                 Score++;
             }
 
-            var oldH = snake[snake.Count-1];
-            snake.Insert(0,newH);
+            var oldH = snake[snake.Count - 1];
+            snake.Insert(0, newH);
             if (!isGrow)
             {
                 snake.Remove(oldH);
@@ -246,82 +223,103 @@ namespace ConsoleApp
             map.matrix[newH.i, newH.j] = Settings.Element;
         }
     }
-    public class Program
+    public static class Controls
     {
+        public static List<ConsoleKey> Arrows
+        {
+            get { return new List<ConsoleKey>() { ConsoleKey.RightArrow, ConsoleKey.LeftArrow, ConsoleKey.UpArrow, ConsoleKey.DownArrow }; }
+        }
+        public static List<ConsoleKey> WASD
+        {
+            get { return new List<ConsoleKey>() { ConsoleKey.D, ConsoleKey.A, ConsoleKey.W, ConsoleKey.S }; }
+        }
+    }
+    internal class Program
+    {
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern IntPtr GetConsoleWindow();
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
+
         static async Task Main(string[] args)
         {
-            await Start();
-        }
-        static async Task Start()
-        {
-            Console.CursorVisible = false;
+            IntPtr handle = GetConsoleWindow();
+
+            MoveWindow(handle, 100, 100, 400, 400, true);
+
+            Console.SetWindowSize(44, 27);
+            //Console.SetBufferSize(44, 27);
+
+            Console.Title = "КЛИЕНТ";
+
+            string serverIp = "127.0.0.1";
+            const int serverPort = 5000;
             Map map = new Map();
-            const int port = 5000;
-            UdpClient server = new UdpClient(port);
-            HashSet<IPEndPoint> clients = new HashSet<IPEndPoint>();
+            Snake snake = new Snake(StartPoint.LeftTop, Direction.Right, Controls.Arrows, Colors.Green);
+            UdpClient client = new UdpClient(0);
+            IPEndPoint serverEP = new IPEndPoint(IPAddress.Parse(serverIp), serverPort);
 
-            List<Snake> snakes = new List<Snake>()
-            {
-                new Snake(StartPoint.LeftTop, Direction.None, Controls.Arrows, Colors.Green),
-            };
-
-            map.GenerateFood();
             List<Task> tasks = new List<Task>()
             {
-                Task.Run(() => Move(snakes, map)),
-                Task.Run(() => ReceiveLoop(server, clients, snakes[0])),
-                Task.Run(() => BroadcastLoop(server, clients, map, snakes[0]))
+                Task.Run(() => Control(snake, client, serverEP)),
+                Task.Run(() => Receive(client, map, snake))
             };
             await Task.WhenAll(tasks);
         }
-        static async Task Move(List<Snake> snakes, Map map)
+        static async Task Send(UdpClient client, IPEndPoint serverEP, Snake snake)
         {
+            byte[] data = Encoding.UTF8.GetBytes($"{snake.direction.ToString()}");
+            client.Send(data, data.Length, serverEP);
+            await Task.Delay(200);
+        }
+        static async Task Receive(UdpClient client, Map card, Snake snake)
+        {
+            IPEndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
             while (true)
             {
-                for (int i = 0; i < snakes.Count; i++)
-                    snakes[i].Move(map);
-
-                await Task.Delay(Settings.Speed);
+                byte[] data = (await client.ReceiveAsync()).Buffer;
+                string message = Encoding.UTF8.GetString(data);
+                string json = Encoding.UTF8.GetString(data);
+                Data map = JsonConvert.DeserializeObject<Data>(json);
+                card.matrix = map.Matrix;
+                card.Food = map.Food;
+                snake.snake = map.Snake;
+                snake.Head = map.Head;
+                card.Print(snake);
             }
         }
-        static async Task ReceiveLoop(UdpClient server, HashSet<IPEndPoint> clients, Snake snake)
+        static async Task Control(Snake snake, UdpClient client, IPEndPoint serverEP)
         {
             while (true)
             {
-                var result = await server.ReceiveAsync();
-                string json = (Encoding.UTF8.GetString(result.Buffer)).Trim();
-                if (Enum.TryParse<Direction>(json, out Direction dir))
+                if (Console.KeyAvailable)
                 {
-                    Console.WriteLine($"{dir}");
-                }
-                var client = result.RemoteEndPoint;
-                clients.Add(client);
-                snake.direction = dir;
-            }
-        }
-        static async Task BroadcastLoop(UdpClient server, HashSet<IPEndPoint> clients, Map map, Snake snake)
-        {
-            Random rnd = new Random();
-            Data response = new Data();
-            while (true)
-            {
-                if (clients.Count > 0)
-                {
-                    response.Matrix = map.matrix;
-                    response.Head = snake.Head;
-                    response.Snake = snake.snake;
-                    response.Food = map.Food;
-                    string json = JsonConvert.SerializeObject(response);
-                    byte[] data = Encoding.UTF8.GetBytes(json);
-                    foreach (var client in clients)
+                    var button = Console.ReadKey(true).Key;
+                    if (snake.R == button && snake.direction != Direction.Left && snake.direction != Direction.Right)
                     {
-                        await server.SendAsync(data, data.Length, client);
+                        snake.direction = Direction.Right;
+                        await Send(client, serverEP, snake);
                     }
+                    else if (snake.L == button && snake.direction != Direction.Right && snake.direction != Direction.Left)
+                    {
+                        snake.direction = Direction.Left;
+                        await Send(client, serverEP, snake);
+                    }
+                    else if (snake.U == button && snake.direction != Direction.Down && snake.direction != Direction.Up)
+                    {
+                        snake.direction = Direction.Up;
+                        await Send(client, serverEP, snake);
+                    }
+                    else if (snake.D == button && snake.direction != Direction.Up && snake.direction != Direction.Down)
+                    {
+                        snake.direction = Direction.Down;
+                        await Send(client, serverEP, snake);
+                    }
+
                 }
-                await Task.Delay(200);
+                await Task.Delay(10);
             }
         }
-
-
     }
 }
